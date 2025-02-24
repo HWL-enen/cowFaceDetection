@@ -1,0 +1,9 @@
+配置文件在跟目录的lib下，若要移植，切换依赖后构建公件。（运行时需要配置vm虚拟机)
+
+记得修改cpu等加载格式；关机格式
+
+--module-path ./lib/openjfx/lib/lib --add-modules javafx.controls,javafx.fxml -Dfile.encoding=UTF-8
+（记得删掉lib下的jar包）
+必要文件
+-lib
+--（e）file

@@ -1,0 +1,2 @@
+public class falsh {
+}

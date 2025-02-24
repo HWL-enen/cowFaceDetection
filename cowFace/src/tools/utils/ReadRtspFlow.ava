@@ -1,0 +1,89 @@
+package reason.platform.webadmin.rtsp.sendModel;
+
+import org.bytedeco.ffmpeg.global.avutil;
+import org.bytedeco.javacv.CanvasFrame;
+import org.bytedeco.javacv.FFmpegFrameGrabber;
+import org.bytedeco.javacv.Frame;
+import org.bytedeco.javacv.FrameGrabber;
+
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+
+// ffmpeg代替opencv 拉流示例
+// ffmpeg -f v4l2 -i /dev/video40 -c:v libx264 -preset ultrafast -tune zerolatency -f flv rtmp://127.0.0.1/live/stream_key
+public class ReadRtspFlow {
+
+    public static void main(String[] args) {
+        String rtspUrl = "your_rtsp_stream_url_here"; // 替换为实际的RTSP流地址
+        FFmpegFrameGrabber grabber = new FFmpegFrameGrabber(rtspUrl);
+        CanvasFrame canvas = new CanvasFrame("RTSP Stream");
+
+        // 设置窗口关闭时退出程序
+        canvas.setDefaultCloseOperation(javax.swing.JFrame.EXIT_ON_CLOSE);
+        // 设置窗口大小
+        canvas.setCanvasSize(640, 480);
+
+        try {
+            System.out.println("Starting RTSP stream: " + rtspUrl);
+            setGrabber(grabber);
+            grabber.start(); // 开始捕获视频流
+            Frame frame;
+            while ((frame = grabber.grabImage()) != null) {
+                // 显示帧
+                canvas.showImage(frame);
+                // 检查窗口是否关闭
+                if (!canvas.isVisible()) {
+                    break;
+                }
+            }
+        } catch (FFmpegFrameGrabber.Exception e) {
+            e.printStackTrace();
+            System.err.println("FFmpegFrameGrabber.Exception: " + e.getMessage());
+        } finally {
+            try {
+                grabber.flush();
+                grabber.stop();
+                grabber.release();
+            } catch (FrameGrabber.Exception e) {
+                System.err.println("FrameGrabber.Exception: " + e.getMessage());
+            }
+            System.out.println("RTSP stream stopped.");
+            canvas.dispose();
+        }
+    }
+
+    private static void setGrabber(FFmpegFrameGrabber grabber) {
+        grabber.setFrameRate(25);
+        avutil.av_log_set_level(avutil.AV_LOG_QUIET);
+        grabber.setOption("rtsp_transport", "tcp"); // 使用TCP传输协议
+        grabber.setOption("rtsp_flags", "prefer_tcp");
+        grabber.setOption("buffer_size", "1024000"); // 设置缓存大小
+        grabber.setNumBuffers(25); // 设置帧缓冲区的数量
+        grabber.setOption("reorder_queue_size", "5"); // 设置要缓冲的数据包数量
+        grabber.setOption("fflags", "nobuffer"); // 禁用内部缓冲
+        grabber.setOption("flags", "low_delay"); // 设置低延迟模式
+        grabber.setOption("probesize", "32"); // 减小探测大小以减少延迟
+        grabber.setOption("analyzeduration", "0"); // 禁用分析时长以减少延迟
+    }
+
+    public static String getVideoCodec(String rtspUrl) {
+        try {
+            ProcessBuilder builder = new ProcessBuilder(
+                    "ffprobe",
+                    "-v", "error",
+                    "-select_streams", "v:0",
+                    "-show_entries", "stream=codec_name",
+                    "-of", "default=noprint_wrappers=1:nokey=1",
+                    rtspUrl
+            );
+
+            Process process = builder.start();
+            try (BufferedReader in = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+                return in.readLine();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+}
